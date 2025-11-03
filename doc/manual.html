@@ -2706,6 +2706,67 @@ editor.setOption("extraKeys", {
       See <a href="../demo/multiplex.html">this demo</a> for an
       example.</dd>
 
+      <dt id="addon_nesting"><a href="../addon/mode/nesting.js"><code>mode/nesting.js</code></a></dt>
+      <dd>
+        The module defines <code>CodeMirror.nestingMode(mainMode: Mode, ...subModeConfigs)</code>
+        as a mode constructor, which creates a "nesting mode" for complex requirements.
+
+        <br><strong>Key features</strong>
+        <ul>
+          <li>
+            STABLE NESTING<br>
+            The closing of a sub mode is prevented if it is itself a
+            nestingMode and itself contains an active sub mode.
+          </li>
+          <li>
+            DYNAMIC SUB MODE CONFIGURATION<br>
+            The start of a sub mode can be defined as a character string
+            or as a regular expression. All further configurations can be
+            queried dynamically via a defined callback at runtime,
+            which receives a regex match that represents the start delimiter.
+          </li>
+          <li>
+            RECURSIVE NESTING<br>
+            In the sub mode configuration, the mode for the area can be
+            defined as a string (Mode MIME or Name) which is only queried
+            internally when activated by CodeMirror.getMode.
+          </li>
+          <li>
+            MASKS<br>
+            Special definitions of sub modes as masks or within non-mask sub
+            modes can be used to create masks with a higher context relevance
+            that prevent a mode from being exited.
+          </li>
+          <li>
+            SUFFIXES<br>
+            Suffixes can be defined in sub mode configurations that are
+            queried once after this sub mode has ended.
+          </li>
+        </ul>
+
+        <strong>Configuration</strong>
+
+        <ul>
+          <li><code>{open, ...</code></li>
+        </ul>
+
+        <dl>
+          <dt><code><strong>open</strong>: string|regexp</code></dt>
+          <dd>
+            ...
+          </dd>
+
+          <dt><code><strong>start</strong>: function(startMatch: RegexpMatchArray) → confUpdate: object</code></dt>
+          <dd>
+            ...
+          </dd>
+
+
+        </dl>
+
+        See <a href="../demo/nesting.html">this demo</a> for an example.
+      </dd>
+
       <dt id="addon_show-hint"><a href="../addon/hint/show-hint.js"><code>hint/show-hint.js</code></a></dt>
       <dd>Provides a framework for showing autocompletion hints.
       Defines <code>editor.showHint</code>, which takes an optional
