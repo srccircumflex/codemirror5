@@ -11,6 +11,8 @@
 })(function(CodeMirror) {
 "use strict";
 
+console.warn("addon/mode/multiplex.js is deprecated, use addon/mode/nesting.js instead (backward compatible)")
+
 CodeMirror.multiplexingMode = function(outer /*, others */) {
   // Others should be {open, close, mode [, delimStyle] [, innerStyle] [, parseDelimiters]} objects
   var others = Array.prototype.slice.call(arguments, 1);

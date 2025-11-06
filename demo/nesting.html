@@ -81,9 +81,10 @@ print(
 	$answer$ - 12 * int(f"{9 + $answer$}")}"[0:]
   + html§
 <html>
-  <body>
-    <h1>this is html</h1>
-  </body>
+  <h1>this is html</h1>
+  <script>
+    alert("And here is some normal JS code"); // also colored
+  </script>
 </html>
 §
 )
@@ -178,14 +179,14 @@ EOF]</textarea>
           start: (match) => {return {close: match[2]}},
           masks: [BS_MASK],
           mode: FSRING_MODE,
-          parseDelimiters: true,
+          tokenizeDelimiters: true,
         },
         {
           open: /\$(?!\s)/,
           close: "$",
           mode: "x",
           masks: [BS_MASK],
-          includeDelimiters: true,
+          parseDelimiters: true,
           suffixes: [
             {
               open: /^\[/,
@@ -227,23 +228,30 @@ EOF]</textarea>
   </script>
 
   <p>Demonstration of mode nesting for complex requirements.</p>
-  <p>The main mode is the python mode.</p>
-  <p>Extended Features:</p>
+  <p>The main mode is the <b>python</b> mode.</p>
+  <p><strong>Extended Features:</strong></p>
   <ul>
     <li>
-      syntax extension for references in the pattern: <code>$ref.path$[optional;getitem]</code>.
-      The components are realized as own sub mode definitions and in conjunction with the <code>suffixes: &lt;Array[&lt;SubModeConfig&gt;, ...]&gt;</code> configuration.
+      Syntax extension for references in the pattern: <code>$ref.path$[optional;getitem]</code>.
+      The components are realized as own sub mode definitions and in conjunction with the
+      <code>suffixes: Array[SubModeConfig, ...]</code> configuration.
     </li>
     <li>
-      active masks to avoid confusion for:
+      Active masks to avoid confusion for:
       <ul>
         <li>string literals</li>
         <li>backslash escape</li>
         <li>comments</li>
       </ul>
     </li>
-    <li>special f-string literal mode for recursive nesting</li>
-    <li>htmlmixed mode in a sub mode configuration</li>
+    <li>Special f-string literal mode for recursive nesting</li>
+    <li><b>htmlmixed</b> mode in a sub mode configuration</li>
   </ul>
+
+  <p>
+    <strong>Parsing/Highlighting Tests:</strong>
+    <a href="../test/index.html#nesting_*">normal</a>,
+    <a href="../test/index.html#verbose,nesting_*">verbose</a>.
+  </p>
   
 </article>

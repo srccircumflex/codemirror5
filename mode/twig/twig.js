@@ -3,9 +3,9 @@
 
 (function(mod) {
   if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"),  require("../../addon/mode/multiplex"));
+    mod(require("../../lib/codemirror"),  require("../../addon/mode/nesting"));
   else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror", "../../addon/mode/multiplex"], mod);
+    define(["../../lib/codemirror", "../../addon/mode/nesting"], mod);
   else // Plain browser env
     mod(CodeMirror);
 })(function(CodeMirror) {
@@ -131,7 +131,7 @@
   CodeMirror.defineMode("twig", function(config, parserConfig) {
     var twigInner = CodeMirror.getMode(config, "twig:inner");
     if (!parserConfig || !parserConfig.base) return twigInner;
-    return CodeMirror.multiplexingMode(
+    return CodeMirror.nestingMode(
       CodeMirror.getMode(config, parserConfig.base), {
         open: /\{[{#%]/, close: /[}#%]\}/, mode: twigInner, parseDelimiters: true
       }

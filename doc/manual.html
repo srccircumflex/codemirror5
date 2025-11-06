@@ -54,11 +54,7 @@
       </ul>
     </li>
     <li><a href="#addons">Addons</a>
-      <ul style="display: none">   <!--
-       ADDON INDEX
-        Already included in the pull request for nestedMode.
-        Excluded for the time being for later update.
-       -->
+      <ul>
         <li><a href="#addon_dialog">dialog (dialog/)</a></li>
         <li><a href="#addon_searchcursor">searchcursor (search/)</a></li>
         <li><a href="#addon_search">search (search/)</a></li>
@@ -76,7 +72,6 @@
         <li><a href="#addon_runmode">runmode (runmode/)</a></li>
         <li><a href="#addon_colorize">colorize (runmode/)</a></li>
         <li><a href="#addon_overlay">overlay (mode/)</a></li>
-        <li><a href="#addon_multiplex">multiplex (mode/)</a></li>
         <li><a href="#addon_nesting">nesting (mode/)</a></li>
         <li><a href="#addon_show-hint">show-hint (hint/)</a></li>
         <li><a href="#addon_javascript-hint">javascript-hint (hint/)</a></li>
@@ -2731,34 +2726,11 @@ editor.setOption("extraKeys", {
       create such a mode. See <a href="../demo/mustache.html">this
       demo</a> for a detailed example.</dd>
 
-      <dt id="addon_multiplex"><a href="../addon/mode/multiplex.js"><code>mode/multiplex.js</code></a></dt>
-      <dd>Mode combinator that can be used to easily 'multiplex'
-      between several modes.
-      Defines <code>CodeMirror.multiplexingMode</code> which, when
-      given as first argument a mode object, and as other arguments
-      any number of <code>{open, close, mode [, delimStyle, innerStyle, parseDelimiters]}</code>
-      objects, will return a mode object that starts parsing using the
-      mode passed as first argument, but will switch to another mode
-      as soon as it encounters a string that occurs in one of
-      the <code>open</code> fields of the passed objects. When in a
-      sub-mode, it will go back to the top mode again when
-      the <code>close</code> string is encountered.
-      Pass <code>"\n"</code> for <code>open</code> or <code>close</code>
-      if you want to switch on a blank line.
-      <ul><li>When <code>delimStyle</code> is specified, it will be the token
-      style returned for the delimiter tokens (as well as
-      <code>[delimStyle]-open</code> on the opening token and
-      <code>[delimStyle]-close</code> on the closing token).</li>
-      <li>When <code>innerStyle</code> is specified, it will be the token
-      style added for each inner mode token.</li>
-      <li>When <code>parseDelimiters</code> is true, the content of
-      the delimiters will also be passed to the inner mode.
-      (And <code>delimStyle</code> is ignored.)</li></ul> The outer
-      mode will not see the content between the delimiters.
-      See <a href="../demo/multiplex.html">this demo</a> for an
-      example.</dd>
-
       <dt id="addon_nesting"><a href="../addon/mode/nesting.js"><code>mode/nesting.js</code></a></dt>
+      <cite>
+        New since v5.66.1. Replaces the module <code>multiplex.js</code> from v5.65.20
+        and is backward compatible in such a way that only import tags need to be updated.
+      </cite>
       <dd>
         The module defines <code>CodeMirror.nestingMode(mainMode: Mode, ...subModeConfigs)</code>
         as a mode constructor, which creates a "nesting mode" for complex requirements.
@@ -2786,10 +2758,9 @@ editor.setOption("extraKeys", {
             internally when activated by CodeMirror.getMode.
           </li>
           <li>
-            MASKS<br>
-            Special definitions of sub modes as masks or within non-mask sub
-            modes can be used to create masks with a higher context relevance
-            that prevent a mode from being exited.
+            LITERALS<br>
+            Special definitions of sub modes as literals or within non-literal sub 
+            modes that prevent a mode from being exited.
           </li>
           <li>
             SUFFIXES<br>
@@ -2806,9 +2777,9 @@ editor.setOption("extraKeys", {
           following patterns:
         </p>
         <ul>
-          <li><code>{open, mode [, modeConfig] [, start] [, close] [, masks] [, suffixes] [, innerStyle] [[, includeDelimiters] | [, parseDelimiters] [, delimStyle]] [, comp]}</code></li>
-          <li><code>{open, start: (match) → mode [, modeConfig] [, close] [, masks] [, suffixes] [, innerStyle] [[, includeDelimiters] | [, parseDelimiters] [, delimStyle]] [, comp]}</code></li>
-          <li><code>{mask: true, open, [, start] [, close] [, masks] [, comp]}</code></li>
+          <li><code>{open, mode [, modeConfig] [, start] [, close] [, literals] [, suffixes] [, innerStyle] [[, parseDelimiters] | [, tokenizeDelimiters] [, delimStyle]] [, comp]}</code></li>
+          <li><code>{open, start: (match) → mode [, modeConfig] [, close] [, literals] [, suffixes] [, innerStyle] [[, parseDelimiters] | [, tokenizeDelimiters] [, delimStyle]] [, comp]}</code></li>
+          <li><code>{literal: true, open, [, start] [, close] [, literals] [, comp]}</code></li>
         </ul>
 
         <h4>Standard options for the sub mode configurations</h4>
@@ -2822,7 +2793,7 @@ editor.setOption("extraKeys", {
           regexp match array.
           <code>open</code> patterns must advance the parsing process, so the match must
           consume characters. An exception is possible through the configuration
-          with <code>includeDelimiters</code>. <code>close</code> patterns do not
+          with <code>tokenizeDelimiters</code>. <code>close</code> patterns do not
           have to consume.
           Line break characters (<code>\n</code>) are not present in the data to be parsed.
           However, an explicit newline character (<code>\n</code>) is passed to the
@@ -2868,7 +2839,7 @@ editor.setOption("extraKeys", {
           These options can be used to define a general scope-related styling
           of tokens in a sub mode area and to control the behavior of the parser in
           relation to the area delimiters.
-          (these options are ignored in mask configurations)
+          (these options are ignored in literal configurations)
         </p>
         <p>
           By default, the delimiters are each parsed statically as an independent
@@ -2876,8 +2847,8 @@ editor.setOption("extraKeys", {
           Possible combinations:
         </p>
         <ul>
-          <li><code>[ , innerStyle ] [ , delimStyle ] [ , parseDelimiters ]</code></li>
-          <li><code>[ , innerStyle ] [ , includeDelimiters ]</code></li>
+          <li><code>[ , innerStyle ] [ , delimStyle ] [ , tokenizeDelimiters ]</code></li>
+          <li><code>[ , innerStyle ] [ , parseDelimiters ]</code></li>
         </ul>
         <dl>
           <dt><code><strong>innerStyle</strong>: string</code></dt>
@@ -2894,13 +2865,13 @@ editor.setOption("extraKeys", {
             (optional)
               A CSS class name that is [additionally] prefixed to the delimiters of
               the area. Internally, the following list prefixes are created:
-              <code>`${delimStyle} ${delimStyle}-open `</code>
-              and <code>`${delimStyle} ${delimStyle}-close `</code>.
+              <code>`${delimStyle} ${delimStyle}-open`</code> for open-delimiters
+              and <code>`${delimStyle} ${delimStyle}-close`</code> for close-delimiters.
           </dd>
         </dl>
 
         <dl>
-          <dt><code><strong>parseDelimiters</strong>: true</code></dt>
+          <dt><code><strong>tokenizeDelimiters</strong>: true</code></dt>
           <dd>
             (optional)
               If set, the contents of the delimiters are transferred in isolation
@@ -2910,7 +2881,7 @@ editor.setOption("extraKeys", {
         </dl>
 
         <dl>
-          <dt><code><strong>includeDelimiters</strong>: true</code></dt>
+          <dt><code><strong>parseDelimiters</strong>: true</code></dt>
           <dd>
             (optional)
               If set, delimiters are seamlessly assigned to the inner area.
@@ -2920,28 +2891,28 @@ editor.setOption("extraKeys", {
 
         <h4>Special parser behavior configuration</h4>
         <dl>
-          <dt><code><strong>mask</strong>: true</code></dt>
-          <dt><code><strong>masks</strong>: Array[MaskConfig, ...]</code></dt>
+          <dt><code><strong>literal</strong>: true</code></dt>
+          <dt><code><strong>literals</strong>: Array[LiteralConfig, ...]</code></dt>
           <dd>
           (optional)
-            Mask configurations enable a context-related definition of areas in
+            Literal configurations enable a context-related definition of areas in
             which exiting a mode is prevented. An application example would be
             string literals that can potentially contain an open or close pattern.
 
-            Mask configurations can in themselves contain mask configurations
-            (<code>masks</code>) for nesting. In the example, this can also ensure that the
-            masking area is not terminated at a quote actually escaped
+            Literal configurations can in themselves contain literal configurations
+            (<code>literals</code>) for nesting. In the example, this can also ensure that the
+            literal area is not terminated at a quote actually escaped
             with a backslash.
 
-            At the root level of the configurations, the mask flag must be set to
-            <code>true</code> to define a mask configuration that can prevent leaving
+            At the root level of the configurations, the literal flag must be set to
+            <code>true</code> to define a literal configuration that can prevent leaving
             the main mode respectively the start of a sub mode.
 
-            In sub modes (also mask modes), an array of mask configurations can be
+            In sub modes (also literal modes), an array of literal configurations can be
             defined that can prevent leaving the area.
 
-            Mask configurations evaluate the following options as described above:
-            <code>open, start, close, masks, comp</code>.
+            Literal configurations evaluate the following options as described above:
+            <code>open, start, close, literals, comp</code>.
           </dd>
         </dl>
 

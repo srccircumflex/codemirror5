@@ -939,12 +939,14 @@ CodeMirror.defineMode("javascript", function(config, parserConfig) {
 
     skipExpression: function(state) {
       parseJS(state, "atom", "atom", "true", new CodeMirror.StringStream("", 2, null))
-    }
+    },
+
+    stringQuotes: `"'\`/`,
+    stringEscape: "\\",
   };
 });
 
 CodeMirror.registerHelper("wordChars", "javascript", /[\w$]/);
-
 CodeMirror.defineMIME("text/javascript", "javascript");
 CodeMirror.defineMIME("text/ecmascript", "javascript");
 CodeMirror.defineMIME("application/javascript", "javascript");

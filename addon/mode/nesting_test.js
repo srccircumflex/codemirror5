@@ -14,7 +14,7 @@
       innerStyle: 'inner'
     };
 
-    return CodeMirror.multiplexingMode(outer, innerOptions);
+    return CodeMirror.nestingMode(outer, innerOptions);
   });
 
   var mode = CodeMirror.getMode({}, "markdown_with_stex");
@@ -24,15 +24,15 @@
       name,
       mode,
       Array.prototype.slice.call(arguments, 1),
-      'multiplexing');
+      'nesting');
   }
 
   MT(
     "stexInsideMarkdown",
     "[strong **Equation:**] [delim&delim-open $][inner&tag \\pi][delim&delim-close $]");
 
-  CodeMirror.defineMode("identical_delim_multiplex", function() {
-    return CodeMirror.multiplexingMode(CodeMirror.getMode({indentUnit: 2}, "javascript"), {
+  CodeMirror.defineMode("identical_delim_nesting", function() {
+    return CodeMirror.nestingMode(CodeMirror.getMode({indentUnit: 2}, "javascript"), {
       open: "#",
       close: "#",
       mode: CodeMirror.getMode({}, "markdown"),
@@ -41,9 +41,9 @@
     });
   });
 
-  var mode2 = CodeMirror.getMode({}, "identical_delim_multiplex");
+  var mode2 = CodeMirror.getMode({}, "identical_delim_nesting");
 
   test.mode("identical_delimiters_with_parseDelimiters", mode2, [
     "[keyword let] [def x] [operator =] [q #foo][q&em *bar*][q #];"
-  ], "multiplexing")
+  ], "nesting")
 })();
