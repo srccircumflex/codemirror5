@@ -42,9 +42,14 @@
  * sub-mode configuration objects as the following arguments.
  * A sub mode configuration object can be configured according to the 
  * following patterns:
+ *  Standard:
  *  - {open, mode [, modeConfig] [, start] [, close] [, literals] [, suffixes] [, innerStyle] [[, parseDelimiters] | [, tokenizeDelimiters] [, delimStyle]] [, comp]}
- *  - {open, start: (match) → mode [, modeConfig] [, close] [, literals] [, suffixes] [, innerStyle] [[, parseDelimiters] | [, tokenizeDelimiters] [, delimStyle]] [, comp]}
+ *  Mode from Callback:
+ *  - {*Standard, start: (match) → {*Standard, mode}}
+ *  Literal:
  *  - {literal: true, open, [, start] [, close] [, literals] [, comp]}
+ *  Suffix:
+ * - {*Standard [, inline]}
  *
  *  Standard options for the sub mode configurations:
  *
@@ -132,27 +137,31 @@
  *        which exiting a mode is prevented. An application example would be
  *        string literals that can potentially contain an open or close pattern.
  *
- *        Literal configurations can in themselves contain literal configurations
- *        (literals) for nesting. In the example, this can also ensure that the
- *        literal area is not terminated at a quote that is actually escaped
- *        with a backslash.
+ *        Literal configurations can in themselves contain literal
+ *        configurations (literals) for nesting. In the example, this can also
+ *        ensure that the literal area is not terminated at a quote that is
+ *        actually escaped with a backslash.
  *
- *        At the root level of the configurations, the literal flag must be set to
- *        true in order to define a literal configuration that can prevent leaving
- *        the main mode respectively the start of a sub mode.
+ *        At the root level of the configurations, the literal flag must be set
+ *        to true in order to define a literal configuration that can prevent
+ *        leaving the main mode respectively the start of a sub mode.
  *
- *        In sub modes (also literal modes), an array of literal configurations can be 
- *        defined that can prevent leaving the area.
+ *        In sub modes (also literal modes), an array of literal configurations
+ *        can be defined that can prevent leaving the area.
  *
- *        Literal configurations evaluate the following options as described above: 
- *        open, start, close, literals, comp.
+ *        Literal configurations evaluate the following options as described
+ *        above: open, start, close, literals, comp.
  *
- *    - suffixes: Array[SubConfig, ...] 
+ *    - suffixes: Array[SuffixConfig, ...] 
  *      (optional)
  *        Suffix configurations can be assigned to a sub mode configuration, 
  *        which are queried once after the sub mode area is closed. 
  *        The configuration of suffixes supports each described option as a
  *        sub mode (for concatenations also the suffixes option).
+ *        By default, the parser searches across blank lines and only discards
+ *        all suffixes if they do not match even in a line with content.
+ *        With `inline: true` it can be specified whether a suffix should also
+ *        be discarded in blank lines if it does not match.
  *
  *    - comp: (thisMatch, otherMatch) => boolean 
  *      (optional)
@@ -194,7 +203,7 @@
 
 CodeMirror.nestingMode = new (class {
   version = "1.0";
-  Conf = class Conf {
+  Conf = class {
     /* CONFIGURATION STANDARDIZATION */
     _makePattern(pattern) {return (typeof pattern == "string") ? new RegExp(RegExp.escape(pattern)) : pattern;}
     _closeAtSOL (stream, from) {return !from && stream.sol() && /^/.exec("");}
@@ -262,6 +271,7 @@ CodeMirror.nestingMode = new (class {
         if (this.innerStyle) this.tokenInner = this._tokenInner;
       }
       this.comp ||= this._compDefault;
+      this.literals = this.literals ? [...this.literals] : []
     }
 
     _startSubMode () {
@@ -269,17 +279,12 @@ CodeMirror.nestingMode = new (class {
         // *@conf* [ mode: <mode> ] | [ mode: <string> [ , modeConfig: <object> ] ]
       if (this.mode) {
         CodeMirror.nestingMode.compileNestIgnoreAtMode(this.mode)
-        this.literals = (this.literals || []).concat(
-          CodeMirror.nestingMode.Conf.makeStruct(
-            this.mode.nestIgnore, 
-            this.clv + 1, true
-          )
-        )
+        this.literals.concat(this.mode.nestIgnore)
       }
       return this
     }
 
-    _startConfDefault = this._startSubMode;
+    _startConfDefault (match) {return new this.constructor(this)._startSubMode();}
     _startConfDynamic (match) {return new this.constructor({...this, ...this.start(match)})._startSubMode();}
 
     static withStart (conf) {
@@ -452,7 +457,6 @@ CodeMirror.nestingMode = new (class {
         // Search for suffixes that were registered at the time the previous configuration was closed (short validity period).
         // *@conf* [ suffixes: <Array[<subModeConfig>, ...]> ]
         configs = [...state.suffixes, ...configs];
-        state.suffixes = undefined;
       }
       var match = this.searchOpen(stream, configs, stream.pos)
       if (match) {
@@ -460,8 +464,12 @@ CodeMirror.nestingMode = new (class {
           match: match,
           run: match.index ? this.preStartSub : this.startSub,
         };
-        return true;
+      } else if (state.suffixes && stream.string === "\n") {
+        state.suffixes = state.suffixes.filter(s => !s.inline)
+      } else {
+        state.suffixes = undefined;
       }
+      return !!match;
     };
 
     /**
@@ -764,7 +772,7 @@ CodeMirror.nestingMode = new (class {
      * Reset the parser state at the end of the sub mode and register possible suffix configurations for the following iteration.
      */
     finally = (state) => {
-      if (state.subConf.suffixes) state.suffixes = state.subConf.suffixes;
+      state.suffixes = state.subConf.suffixes;
       state.main.finally(state);
     };
   };
@@ -861,7 +869,7 @@ CodeMirror.nestingMode = new (class {
     finalizeDirectDelim = this.delimClose;
   });
   TokenGetters = {
-    default: (stream, state, mode) => mode.token(stream, state),
+    default: function (stream, modeState, mode) {return mode.token(stream, modeState, this /*: nestState */)},
     blankLine: (stream) => stream.pos = 1,
   };
   /* < PARSERS */
@@ -872,40 +880,50 @@ CodeMirror.nestingMode = new (class {
     strings = {};
   })
   compileNestIgnoreAtMode (mode) {
+    var compile = (literal) => CodeMirror.nestingMode.Conf.makeStruct(
+      [literal], 
+      Infinity, // clv irrelevant
+      true  // is literal
+    )[0];
     mode.nestIgnore ||= [];
-    if (mode.stringQuotes) {
-      var k = mode.stringQuotes;
-      if (mode.stringEscape) k += "\0" + mode.stringEscape;
-      var conf = this.NestIgnoreCaches.strings[k];
-      if (!conf) {
-        this.NestIgnoreCaches.strings[k] = conf = {
-          open: new RegExp(mode.stringQuotes.split("").map(x => RegExp.escape(x)).join("|")), 
-          start: (m) => RegExp.escape(m[0]),
-        };
-        if (mode.stringEscape) {
-          conf.literals = [{
-            open: new RegExp(RegExp.escape(mode.stringEscape) + "(.|$)"),
-            close: "",
-            innerStyle: "esc",
-          }];
+    if (!mode.nestIgnore.compiled) {
+      mode.nestIgnore.compiled = true
+      if (mode.stringQuotes) {
+        var k = mode.stringQuotes;
+        if (mode.stringEscape) k += "\0" + mode.stringEscape;
+        var conf = this.NestIgnoreCaches.strings[k];
+        if (!conf) {
+          conf = compile({
+            open: new RegExp(mode.stringQuotes.split("").map(x => RegExp.escape(x)).join("|")), 
+            start: (m) => RegExp.escape(m[0]),
+          });
+          this.NestIgnoreCaches.strings[k] = conf;
+          if (mode.stringEscape) {
+            conf.literals = [compile({
+              open: new RegExp(RegExp.escape(mode.stringEscape) + "(.|$)"),
+              close: "",
+              innerStyle: "esc",
+            })];
+          }
         }
+        mode.nestIgnore.push(conf);
       }
-      mode.nestIgnore.push(conf);
-    }
-    if (mode.lineComment) {
-        var lC = (k) => {
-          mode.nestIgnore.push(
-            this.NestIgnoreCaches.lineComments[k]
-            || (this.NestIgnoreCaches.lineComments[k] = {open: k})
-          );
+      if (mode.lineComment) {
+          var lC = (k) => {
+            mode.nestIgnore.push(
+              this.NestIgnoreCaches.lineComments[k]
+              || (this.NestIgnoreCaches.lineComments[k] = compile({open: k}))
+            );
+          }
+          typeof mode.lineComment == "array" ? mode.lineComment.forEach(lC) : lC(mode.lineComment);
         }
-        typeof mode.lineComment == "array" ? mode.lineComment.forEach(lC) : lC(mode.lineComment);
+      if (mode.blockCommentStart) {    
+        var k = `${mode.blockCommentStart}\0${mode.blockCommentEnd}`
+        mode.nestIgnore.push(
+          this.NestIgnoreCaches.blockComments[k] 
+          || (this.NestIgnoreCaches.blockComments[k] = compile({open: mode.blockCommentStart, close: mode.blockCommentEnd}))
+        );
       }
-    if (mode.blockCommentStart) {      
-      mode.nestIgnore.push(
-        this.NestIgnoreCaches.blockComments[`${mode.blockCommentStart}\0${mode.blockCommentEnd}`] 
-        || (this.NestIgnoreCaches.blockComments[k] = {open: mode.blockCommentStart, close: mode.blockCommentEnd})
-      );
     }
   }
 
@@ -917,9 +935,9 @@ CodeMirror.nestingMode = new (class {
         Nesting: CodeMirror.nestingMode, 
           // flag
 
-        startState: function() {
+        startState: function(outerIndent) {
           return {
-            mainState: CodeMirror.startState(mainMode),
+            mainState: CodeMirror.startState(mainMode, outerIndent),
             subConf: null,
             subState: null,
             parser: main.entry,

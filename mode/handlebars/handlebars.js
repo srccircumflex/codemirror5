@@ -52,7 +52,7 @@
       { regex: /./, token: "comment" }
     ],
     meta: {
-      blockCommentStart: "{{--",
+      blockCommentStart: "{{!--",
       blockCommentEnd: "--}}"
     }
   });
@@ -63,6 +63,7 @@
     return CodeMirror.nestingMode(
       CodeMirror.getMode(config, parserConfig.base),
       {open: "{{", close: /\}\}\}?/, mode: handlebars, parseDelimiters: true},
+      {open: "{{!--", close: "--}}", mode: {name: "handlebars-multiline-comment", token: (stream, state) => {stream.skipToEnd(); return "comment"}}, parseDelimiters: true},
     );
   });
 

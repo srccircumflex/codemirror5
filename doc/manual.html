@@ -2777,9 +2777,22 @@ editor.setOption("extraKeys", {
           following patterns:
         </p>
         <ul>
-          <li><code>{open, mode [, modeConfig] [, start] [, close] [, literals] [, suffixes] [, innerStyle] [[, parseDelimiters] | [, tokenizeDelimiters] [, delimStyle]] [, comp]}</code></li>
-          <li><code>{open, start: (match) → mode [, modeConfig] [, close] [, literals] [, suffixes] [, innerStyle] [[, parseDelimiters] | [, tokenizeDelimiters] [, delimStyle]] [, comp]}</code></li>
-          <li><code>{literal: true, open, [, start] [, close] [, literals] [, comp]}</code></li>
+          <li>
+            <strong>Standard</strong>:<br>
+            <code>{open, mode [, modeConfig] [, start] [, close] [, literals] [, suffixes] [, innerStyle] [[, parseDelimiters] | [, tokenizeDelimiters] [, delimStyle]] [, comp]}</code>
+          </li>
+          <li>
+            <strong>Mode from Callback</strong>:<br>
+            <code>{*Standard, start: (match) → {*Standard, mode}}</code>
+          </li>
+          <li>
+            <strong>Literal</strong>:<br>
+            <code>{literal: true, open, [, start] [, close] [, literals] [, comp]}</code>
+          </li>
+          <li>
+            <strong>Suffix</strong>:<br>
+            <code>{*Standard [, inline]}</code>
+          </li>
         </ul>
 
         <h4>Standard options for the sub mode configurations</h4>
@@ -2924,6 +2937,10 @@ editor.setOption("extraKeys", {
               which are queried once after the sub mode area is closed.
               The configuration of suffixes supports each described option as a
               sub mode (for concatenation also this).
+              By default, the parser searches across blank lines and only discards
+              all suffixes if they do not match even in a line with content.
+              With <code>inline: true</code> it can be specified whether a suffix should also be
+              discarded in blank lines if it does not match.
           </dd>
         </dl>
 
