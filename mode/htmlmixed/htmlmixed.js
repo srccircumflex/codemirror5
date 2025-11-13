@@ -69,7 +69,7 @@
     }
   }
 
-  CodeMirror.defineMode("_htmlmixed", function (config, parserConfig) {
+  CodeMirror.defineMode("htmlmixed", function (config, parserConfig) {
     var htmlMode = CodeMirror.getMode(config, {
       name: "xml",
       htmlMode: true,
@@ -148,31 +148,6 @@
       }
     };
   }, "xml", "javascript", "css");
-
-  CodeMirror.defineMode("htmlmixed", function (config, parserConfig) {
-    return CodeMirror.nestingMode(
-      CodeMirror.getMode(config, {
-        name: "xml",
-        htmlMode: true,
-        multilineTagIndentFactor: parserConfig.multilineTagIndentFactor,
-        multilineTagIndentPastTag: parserConfig.multilineTagIndentPastTag,
-        allowMissingTagName: parserConfig.allowMissingTagName,
-      }),
-      {
-        open: "<script>",
-        close: "</script>",
-        mode: CodeMirror.getMode(config, "javascript"),
-        delimStyle: "tag",
-      },
-      {
-        open: "<style>",
-        close: "</style>",
-        mode: CodeMirror.getMode(config, "css"),
-        modeConfig: config,
-        delimStyle: "tag",
-      },
-    )
-  })
 
   CodeMirror.defineMIME("text/html", "htmlmixed");
 });

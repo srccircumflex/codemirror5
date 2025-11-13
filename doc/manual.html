@@ -2829,7 +2829,7 @@ editor.setOption("extraKeys", {
               the start delimiter. The returned object updates this configuration.
           </dd>
 
-          <dt><code><strong>mode</strong>: string|mode object</code></dt>
+          <dt><code><strong>mode</strong>: mode spec|mode object</code></dt>
           <dd>
             (must be set after start at the latest)
               The mode for the defined area. Can be passed as a CodeMirror mode
@@ -2884,11 +2884,11 @@ editor.setOption("extraKeys", {
         </dl>
 
         <dl>
-          <dt><code><strong>tokenizeDelimiters</strong>: true</code></dt>
+          <dt><code><strong>tokenizeDelimiters</strong>: true|mode spec|mode object</code></dt>
           <dd>
             (optional)
               If set, the contents of the delimiters are transferred in isolation
-              to the tokenization of the inner mode.
+              to the tokenization of the inner or specific mode.
               (default prefixes can be defined via <code>delimStyle</code>)
           </dd>
         </dl>
