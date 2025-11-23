@@ -9,7 +9,6 @@ import { lst, map } from "../util/misc.js"
 import { signalLater } from "../util/operation_group.js"
 import { splitLinesAuto } from "../util/feature_detection.js"
 
-import { indentLine } from "./indent.js"
 
 // This will be set to a {lineWise: bool, text: [string]} object, so
 // that, when pasting, we know what kind of selections the copied
@@ -18,6 +17,16 @@ export let lastCopied = null
 
 export function setLastCopied(newLastCopied) {
   lastCopied = newLastCopied
+}
+
+export function handlePaste(e, cm) {
+  let pasted = e.clipboardData && e.clipboardData.getData("Text")
+  if (pasted) {
+    e.preventDefault()
+    if (!cm.isReadOnly() && !cm.options.disableInput && cm.hasFocus())
+      runInOp(cm, () => applyTextInput(cm, pasted, 0, null, "paste"))
+    return true
+  }
 }
 
 export function applyTextInput(cm, inserted, deleted, sel, origin) {
@@ -59,8 +68,11 @@ export function applyTextInput(cm, inserted, deleted, sel, origin) {
     makeChange(cm.doc, changeEvent)
     signalLater(cm, "inputRead", cm, changeEvent)
   }
-  if (inserted && !paste)
-    triggerElectric(cm, inserted)
+
+  if (inserted && !paste) {
+    triggerNestMaps(cm, inserted);
+    triggerElectric(cm, inserted);
+  }
 
   ensureCursorVisible(cm)
   if (cm.curOp.updateInput < 2) cm.curOp.updateInput = updateInput
@@ -68,13 +80,49 @@ export function applyTextInput(cm, inserted, deleted, sel, origin) {
   cm.state.pasteIncoming = cm.state.cutIncoming = -1
 }
 
-export function handlePaste(e, cm) {
-  let pasted = e.clipboardData && e.clipboardData.getData("Text")
-  if (pasted) {
-    e.preventDefault()
-    if (!cm.isReadOnly() && !cm.options.disableInput && cm.hasFocus())
-      runInOp(cm, () => applyTextInput(cm, pasted, 0, null, "paste"))
-    return true
+function triggerNestMaps (cm, inserted) {
+  let sel = cm.doc.sel;
+  for (let i = sel.ranges.length - 1; i >= 0; i--) {
+    const POINTER = sel.ranges[i].head;
+    sel.ranges[i].anchor = POINTER;
+    //pos.ch += inserted.length;
+    let token = cm.getTokenAt(POINTER),
+        delim = token.spec.delim;
+    if (delim) {
+      let bindings = cm.Nester.globalDelimMap.fetch(delim),
+          nest = token.nest;
+      if (nest.delimMap) {
+        bindings = bindings.concat(nest.delimMap.fetch(delim));
+      }
+      for (let binding of bindings) {
+        binding(cm, inserted, token, nest, token.nesterState, POINTER);
+      }
+    }
+  }
+  cm.setSelections(sel.ranges);
+}
+
+export function triggerElectricCloseDelim (cm, token, selRange) {
+  if (token.spec.delim && token.spec.delim.endsWith("c<") && token.nest._indentClose) {
+    let how = token.nest._indentClose.getHow(
+      token,
+      cm.getLine(selRange.head.line),
+      selRange,
+    );
+    if (how !== false) return cm.indentLine(selRange.head.line, how);
+  }
+}
+
+export function triggerElectricInput (cm, token, inserted, selRange) {
+  let mode = token.innerMode;
+  if (mode.electricChars) {
+    for (let j = 0; j < mode.electricChars.length; j++)
+      if (inserted.indexOf(mode.electricChars.charAt(j)) > -1) {
+        return cm.indentLine(selRange.head.line, "smart");
+      }
+  } else if (mode.electricInput) {
+    if (mode.electricInput.test(cm.getLine(selRange.head.line).slice(0, selRange.head.ch)))
+      return cm.indentLine(selRange.head.line, "smart");
   }
 }
 
@@ -86,19 +134,10 @@ export function triggerElectric(cm, inserted) {
   for (let i = sel.ranges.length - 1; i >= 0; i--) {
     let range = sel.ranges[i]
     if (range.head.ch > 100 || (i && sel.ranges[i - 1].head.line == range.head.line)) continue
-    let mode = cm.getModeAt(range.head)
-    let indented = false
-    if (mode.electricChars) {
-      for (let j = 0; j < mode.electricChars.length; j++)
-        if (inserted.indexOf(mode.electricChars.charAt(j)) > -1) {
-          indented = indentLine(cm, range.head.line, "smart")
-          break
-        }
-    } else if (mode.electricInput) {
-      if (mode.electricInput.test(getLine(cm.doc, range.head.line).text.slice(0, range.head.ch)))
-        indented = indentLine(cm, range.head.line, "smart")
-    }
-    if (indented) signalLater(cm, "electricInput", cm, range.head.line)
+    let token = cm.getTokenAt(range.head);
+    if (
+      triggerElectricCloseDelim(cm, token, range) || triggerElectricInput(cm, token, inserted, range)
+    ) signalLater(cm, "electricInput", cm, range.head.line)
   }
 }
 

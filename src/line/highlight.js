@@ -56,6 +56,128 @@ class Context {
 }
 
 
+export class Token {
+  constructor(
+    spec,
+    rootMode,
+    state,
+    line,
+    start,
+    end,
+    string,
+  ) {
+    this.spec = spec;
+    this.rootMode = rootMode;
+    this.state = state;
+    this.line = line;
+    this.start = start;
+    this.end = end;
+    this.string = string;
+  }
+  get type () {
+    // backwards compatibility
+    return this.spec.token;
+  }
+  get token () {return this.spec.token;}
+  _modeTrace;
+  get modeTrace () {
+    if (this._modeTrace) return this._modeTrace;
+    let info = {mode: this.rootMode, state: this.state, nest: undefined}, i;
+    this._modeTrace = [info];
+    while (info.mode.innerMode) {
+      i = info.mode.innerMode(info.state);
+      if (!i || i.mode == info.mode) break;
+      this._modeTrace.push(info = i);
+    }
+    return this._modeTrace;
+  }
+  get innerModeInfo () {
+    let trace = this.modeTrace;
+    return trace[trace.length-1];
+  }
+  modeTraceGetter (lv) {
+    let trace = this.modeTrace;
+    return trace[lv < 0 ? trace.length + lv: lv];
+  }
+  get innerMode () {return this.innerModeInfo.mode;}
+  _nesterState;
+  get nesterState () {return this._nesterState = this._nesterState != undefined ? this._nesterState : this.modeTraceGetter(-2)?.state || null;}
+  _nest;
+  get nest () {
+    if (this._nest != undefined) return this._nest;
+    if (this.spec.delim && this.spec.delim.endsWith("c<")) {
+      this._nest = this.nesterState.nestBefore;
+    } else {
+      this._nest = this.nesterState?.nest || null;
+    }
+    return this._nest;
+  }
+  static FromStream (spec, rootMode, stream, state) {
+    const token = new Token(spec, rootMode, state, stream.lineOracle.line, stream.start, stream.pos, stream.current());
+    return token;
+  }
+  static FromRawSpec (spec, rootMode, stream, state) {
+    return Token.FromStream(Token._serialize_spec(spec), rootMode, stream, state);
+  }
+  static GetRawSpec (mode, stream, state) {
+    for (let i = 0; i < 10; i++) {
+      let spec = mode.token(stream, state);
+      if (stream.pos > stream.start) return spec;
+    }
+    throw new Error("Mode " + mode.name + " failed to advance stream.");
+  }
+  static _serialize_spec (spec) {
+    if (spec === null || !(typeof spec == "object")) spec = {token: spec || null};
+    return spec;
+  }
+  static SerialSpec (mode, stream, state) {
+    const token = new Token(
+      Token._serialize_spec(Token.GetRawSpec(mode, stream, state)),
+      mode,
+      state
+    );
+    return token;
+  }
+  static _Read (
+    cm, pos, precise,
+    done,
+    itr,
+    fin,
+  ) {
+    let doc = cm.doc, mode = doc.mode, spec;
+    pos = clipPos(doc, pos);
+    let line = getLine(doc, pos.line), context = getContextBefore(cm, pos.line, precise);
+    let stream = new StringStream(line.text, cm.options.tabSize, context);
+
+    do {
+      stream.start = stream.pos;
+      spec = Token.GetRawSpec(mode, stream, context.state)
+      itr(spec, mode, stream, context.state);
+    } while (!done(stream, pos));
+    return fin(spec, mode, stream, context.state);
+  }
+  static ReadAt (cm, pos, precise) {
+    return Token._Read(
+      cm, pos, precise,
+      (stream, pos) => stream.pos >= pos.ch || stream.eol(),
+      () => null,
+      Token.FromRawSpec,
+    );
+  }
+  static ReadLine (cm, pos, precise) {
+    const tokens = [];
+    Token._Read(
+      cm, pos, precise,
+      (stream) => stream.eol(),
+      (spec, rootMode, stream, state) => tokens.push(Token.FromRawSpec(spec, rootMode, stream, copyState(rootMode, state))),
+      () => null,
+    );
+    return tokens;
+  }
+}
+
+
+
 // Compute a style array (an array starting with a mode generation
 // -- for invalidation -- followed by pairs of end positions and
 // style strings), which is used to highlight the tokens on the
@@ -65,7 +187,7 @@ export function highlightLine(cm, line, context, forceToEnd) {
   // mode/overlays that it is based on (for easy invalidation).
   let st = [cm.state.modeGen], lineClasses = {}
   // Compute the base array of styles
-  runMode(cm, line.text, cm.doc.mode, context, (end, style) => st.push(end, style),
+  runMode(cm, line.text, cm.doc.mode, context, (end, token) => st.push(end, token),
           lineClasses, forceToEnd)
   let state = context.state
 
@@ -74,7 +196,7 @@ export function highlightLine(cm, line, context, forceToEnd) {
     context.baseTokens = st
     let overlay = cm.state.overlays[o], i = 1, at = 0
     context.state = true
-    runMode(cm, line.text, overlay.mode, context, (end, style) => {
+    runMode(cm, line.text, overlay.mode, context, (end, token) => {
       let start = i
       // Ensure there's a token end at the current position, and that i points at it
       while (at < end) {
@@ -84,14 +206,15 @@ export function highlightLine(cm, line, context, forceToEnd) {
         i += 2
         at = Math.min(end, i_end)
       }
-      if (!style) return
+      if (!token.token) return
       if (overlay.opaque) {
-        st.splice(start, i - start, end, "overlay " + style)
+        token.token = "overlay " + token.token;
+        st.splice(start, i - start, end, token)
         i = start + 2
       } else {
         for (; start < i; start += 2) {
           let cur = st[start+1]
-          st[start+1] = (cur ? cur + " " : "") + "overlay " + style
+          cur.token = (cur.token ? cur.token + " " : "") + "overlay " + token.token
         }
       }
     }, lineClasses)
@@ -100,23 +223,23 @@ export function highlightLine(cm, line, context, forceToEnd) {
     context.baseTokenPos = 1
   }
 
-  return {styles: st, classes: lineClasses.bgClass || lineClasses.textClass ? lineClasses : null}
+  return {tokens: st, classes: lineClasses.bgClass || lineClasses.textClass ? lineClasses : null}
 }
 
-export function getLineStyles(cm, line, updateFrontier) {
-  if (!line.styles || line.styles[0] != cm.state.modeGen) {
+export function getLineTokens(cm, line, updateFrontier) {
+  if (!line.tokens || line.tokens[0] != cm.state.modeGen) {
     let context = getContextBefore(cm, lineNo(line))
     let resetState = line.text.length > cm.options.maxHighlightLength && copyState(cm.doc.mode, context.state)
     let result = highlightLine(cm, line, context)
     if (resetState) context.state = resetState
     line.stateAfter = context.save(!resetState)
-    line.styles = result.styles
+    line.tokens = result.tokens
     if (result.classes) line.styleClasses = result.classes
     else if (line.styleClasses) line.styleClasses = null
     if (updateFrontier === cm.doc.highlightFrontier)
       cm.doc.modeFrontier = Math.max(cm.doc.modeFrontier, ++cm.doc.highlightFrontier)
   }
-  return line.styles
+  return line.tokens
 }
 
 export function getContextBefore(cm, n, precise) {
@@ -141,53 +264,19 @@ export function getContextBefore(cm, n, precise) {
 // aren't currently visible.
 export function processLine(cm, text, context, startAt) {
   let mode = cm.doc.mode
-  let stream = new StringStream(text, cm.options.tabSize, context)
-  stream.start = stream.pos = startAt || 0
-  if (text == "") callBlankLine(mode, context.state)
+  let stream = new StringStream(text, cm.options.tabSize, context, startAt)
+  if (text == "") callBlankLine(mode, context.state, stream)
   while (!stream.eol()) {
-    readToken(mode, stream, context.state)
+    Token.GetRawSpec(mode, stream, context.state)
     stream.start = stream.pos
   }
 }
 
-function callBlankLine(mode, state) {
-  if (mode.blankLine) return mode.blankLine(state)
-  if (!mode.innerMode) return
-  let inner = innerMode(mode, state)
-  if (inner.mode.blankLine) return inner.mode.blankLine(inner.state)
-}
-
-function readToken(mode, stream, state, inner) {
-  for (let i = 0; i < 10; i++) {
-    if (inner) inner[0] = innerMode(mode, state).mode
-    let style = mode.token(stream, state)
-    if (stream.pos > stream.start) return style
+function callBlankLine(mode, state, stream) {
+  while (!mode.blankLine && mode.innerMode) {
+    var {mode, state} = innerMode(mode, state)
   }
-  throw new Error("Mode " + mode.name + " failed to advance stream.")
-}
-
-class Token {
-  constructor(stream, type, state) {
-    this.start = stream.start; this.end = stream.pos
-    this.string = stream.current()
-    this.type = type || null
-    this.state = state
-  }
-}
-
-// Utility for getTokenAt and getLineTokens
-export function takeToken(cm, pos, precise, asArray) {
-  let doc = cm.doc, mode = doc.mode, style
-  pos = clipPos(doc, pos)
-  let line = getLine(doc, pos.line), context = getContextBefore(cm, pos.line, precise)
-  let stream = new StringStream(line.text, cm.options.tabSize, context), tokens
-  if (asArray) tokens = []
-  while ((asArray || stream.pos < pos.ch) && !stream.eol()) {
-    stream.start = stream.pos
-    style = readToken(mode, stream, context.state)
-    if (asArray) tokens.push(new Token(stream, style, copyState(doc.mode, context.state)))
-  }
-  return asArray ? tokens : new Token(stream, style, context.state)
+  if (mode.blankLine) return mode.blankLine(state, stream)
 }
 
 function extractLineClasses(type, output) {
@@ -208,29 +297,29 @@ function extractLineClasses(type, output) {
 function runMode(cm, text, mode, context, f, lineClasses, forceToEnd) {
   let flattenSpans = mode.flattenSpans
   if (flattenSpans == null) flattenSpans = cm.options.flattenSpans
-  let curStart = 0, curStyle = null
-  let stream = new StringStream(text, cm.options.tabSize, context), style
-  let inner = cm.options.addModeClass && [null]
-  if (text == "") extractLineClasses(callBlankLine(mode, context.state), lineClasses)
+  let curStart = 0, curToken = {token: null}
+  let stream = new StringStream(text, cm.options.tabSize, context), tokenSpec
+  if (text == "") extractLineClasses(callBlankLine(mode, context.state, stream), lineClasses)
   while (!stream.eol()) {
     if (stream.pos > cm.options.maxHighlightLength) {
       flattenSpans = false
       if (forceToEnd) processLine(cm, text, context, stream.pos)
       stream.pos = text.length
-      style = null
+      tokenSpec = null
     } else {
-      style = extractLineClasses(readToken(mode, stream, context.state, inner), lineClasses)
+      tokenSpec = Token.SerialSpec(mode, stream, context.state);
+      extractLineClasses(tokenSpec.token, lineClasses);
     }
-    if (inner) {
-      let mName = inner[0].name
-      if (mName) style = "m-" + (style ? mName + " " + style : mName)
+    if (cm.options.addModeClass) {
+      let mName = tokenSpec.innerMode.name
+      if (mName) tokenSpec.token = "m-" + (tokenSpec.token ? mName + " " + tokenSpec.token : mName)
     }
-    if (!flattenSpans || curStyle != style) {
+    if (!flattenSpans || curToken.token != tokenSpec.token) {
       while (curStart < stream.start) {
         curStart = Math.min(stream.start, curStart + 5000)
-        f(curStart, curStyle)
+        f(curStart, curToken)
       }
-      curStyle = style
+      curToken = tokenSpec
     }
     stream.start = stream.pos
   }
@@ -239,7 +328,7 @@ function runMode(cm, text, mode, context, f, lineClasses, forceToEnd) {
     // characters, and returns inaccurate measurements in nodes
     // starting around 5000 chars.
     let pos = Math.min(stream.pos, curStart + 5000)
-    f(pos, curStyle)
+    f(pos, curToken)
     curStart = pos
   }
 }

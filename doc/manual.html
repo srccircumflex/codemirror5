@@ -2732,7 +2732,7 @@ editor.setOption("extraKeys", {
         and is backward compatible in such a way that only import tags need to be updated.
       </cite>
       <dd>
-        The module defines <code>CodeMirror.nestingMode(mainMode: Mode, ...subModeConfigs)</code>
+        The module defines <code>CodeMirror.Nester(mainMode: Mode, ...subModeConfigs)</code>
         as a mode constructor, which creates a "nesting mode" for complex requirements.
         See <a href="../demo/nesting.html">this demo</a> for an example.
 
@@ -2740,7 +2740,7 @@ editor.setOption("extraKeys", {
         <ul>
           <li>
             MULTI-LEVEL NESTING<br>
-            nestingMode recognizes active nestingMode in subordinate area
+            Nester recognizes active Nests in subordinate area
             configurations recursively and always handles the currently active mode
             at the lowest level.
           </li>
@@ -2965,7 +2965,7 @@ editor.setOption("extraKeys", {
               is always a <code>"startMatch"</code> in which <code>conf</code> is set to the relevant
               sub mode configuration. <code>otherMatch</code> can also be a <code>"startMatch"</code>
               when comparing with each other, or is an <code>"endMatch"</code> in which <code>state</code>
-              is set to the current <code>nestingMode</code> state.
+              is set to the current <code>Nest</code> state.
 
               The order in which delimiters are potentially compared with each other is
               determined by the order in the configurations.

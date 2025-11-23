@@ -5,7 +5,7 @@ import { eventMixin, signal } from "../util/event.js"
 import { hasBadBidiRects, zeroWidthElement } from "../util/feature_detection.js"
 import { lst, spaceStr } from "../util/misc.js"
 
-import { getLineStyles } from "./highlight.js"
+import { getLineTokens } from "./highlight.js"
 import { attachMarkedSpans, compareCollapsedMarkers, detachMarkedSpans, lineIsHidden, visualLineContinued } from "./spans.js"
 import { getLine, lineNo, updateLineHeight } from "./utils_line.js"
 
@@ -30,7 +30,7 @@ eventMixin(Line)
 export function updateLine(line, text, markedSpans, estimateHeight) {
   line.text = text
   if (line.stateAfter) line.stateAfter = null
-  if (line.styles) line.styles = null
+  if (line.tokens) line.tokens = null
   if (line.order != null) line.order = null
   detachMarkedSpans(line)
   attachMarkedSpans(line, markedSpans)
@@ -48,7 +48,8 @@ export function cleanUpLine(line) {
 // containing one or more styles) to a CSS style. This is cached,
 // and also looks for line-wide styles.
 let styleToClassCache = {}, styleToClassCacheWithMode = {}
-function interpretTokenStyle(style, options) {
+function interpretTokenStyle(token, options) {
+  let style = token.token;
   if (!style || /^\s*$/.test(style)) return null
   let cache = options.addModeClass ? styleToClassCacheWithMode : styleToClassCache
   return cache[style] ||
@@ -82,7 +83,7 @@ export function buildLineContent(cm, lineView) {
       builder.addToken = buildTokenBadBidi(builder.addToken, order)
     builder.map = []
     let allowFrontierUpdate = lineView != cm.display.externalMeasured && lineNo(line)
-    insertLineContent(line, builder, getLineStyles(cm, line, allowFrontierUpdate))
+    insertLineContent(line, builder, getLineTokens(cm, line, allowFrontierUpdate))
     if (line.styleClasses) {
       if (line.styleClasses.bgClass)
         builder.bgClass = joinClasses(line.styleClasses.bgClass, builder.bgClass || "")
@@ -247,11 +248,11 @@ function buildCollapsedSpan(builder, size, marker, ignoreWidget) {
 
 // Outputs a number of spans to make up a line, taking highlighting
 // and marked text into account.
-function insertLineContent(line, builder, styles) {
+function insertLineContent(line, builder, tokens) {
   let spans = line.markedSpans, allText = line.text, at = 0
   if (!spans) {
-    for (let i = 1; i < styles.length; i+=2)
-      builder.addToken(builder, allText.slice(at, at = styles[i]), interpretTokenStyle(styles[i+1], builder.cm.options))
+    for (let i = 1; i < tokens.length; i+=2)
+      builder.addToken(builder, allText.slice(at, at = tokens[i]), interpretTokenStyle(tokens[i+1], builder.cm.options))
     return
   }
 
@@ -316,8 +317,8 @@ function insertLineContent(line, builder, styles) {
         pos = end
         spanStartStyle = ""
       }
-      text = allText.slice(at, at = styles[i++])
-      style = interpretTokenStyle(styles[i++], builder.cm.options)
+      text = allText.slice(at, at = tokens[i++])
+      style = interpretTokenStyle(tokens[i++], builder.cm.options)
     }
   }
 }

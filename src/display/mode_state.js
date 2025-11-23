@@ -13,7 +13,7 @@ export function loadMode(cm) {
 export function resetModeState(cm) {
   cm.doc.iter(line => {
     if (line.stateAfter) line.stateAfter = null
-    if (line.styles) line.styles = null
+    if (line.tokens) line.tokens = null
   })
   cm.doc.modeFrontier = cm.doc.highlightFrontier = cm.doc.first
   startWorker(cm, 100)

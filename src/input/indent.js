@@ -12,19 +12,25 @@ import { countColumn, Pass, spaceStr } from "../util/misc.js"
 // lines are not indented, and places where the mode returns Pass
 // are left alone.
 export function indentLine(cm, n, how, aggressive) {
-  let doc = cm.doc, state
-  if (how == null) how = "add"
+  let doc = cm.doc, state, indentation;
+
+  let tabSize = cm.options.tabSize;
+  let line = getLine(doc, n), curSpace = countColumn(line.text, null, tabSize);
+  if (line.stateAfter) line.stateAfter = null;
+  let curSpaceString = line.text.match(/^\s*/)[0];
+
+  if (how == null) how = "add";
+  if (typeof how == "object") {  // state
+    state = how;
+    how = "smart";
+  }
   if (how == "smart") {
     // Fall back to "prev" when the mode doesn't have an indentation
     // method.
-    if (!doc.mode.indent) how = "prev"
-    else state = getContextBefore(cm, n).state
+    if (!doc.mode.indent) how = "prev";
+    else state ||= getContextBefore(cm, n).state;
   }
 
-  let tabSize = cm.options.tabSize
-  let line = getLine(doc, n), curSpace = countColumn(line.text, null, tabSize)
-  if (line.stateAfter) line.stateAfter = null
-  let curSpaceString = line.text.match(/^\s*/)[0], indentation
   if (!aggressive && !/\S/.test(line.text)) {
     indentation = 0
     how = "not"

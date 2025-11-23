@@ -941,8 +941,11 @@ CodeMirror.defineMode("javascript", function(config, parserConfig) {
       parseJS(state, "atom", "atom", "true", new CodeMirror.StringStream("", 2, null))
     },
 
-    stringQuotes: `"'\`/`,
-    stringEscape: "\\",
+    stringQuotes: {
+      inline: `'"`,
+      multi: '`',
+      escape: `\\`,
+    },
   };
 });
 

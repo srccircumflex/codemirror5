@@ -21,6 +21,12 @@
     "lint": "bin/lint"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/plugin-proposal-logical-assignment-operators": "^7.20.7",
+    "@babel/plugin-proposal-optional-chaining": "^7.21.0",
+    "@babel/plugin-transform-class-properties": "^7.27.1",
+    "@babel/preset-env": "^7.28.5",
+    "@rollup/plugin-babel": "^6.1.0",
     "@rollup/plugin-buble": "^0.21.3",
     "blint": "^1.1.2",
     "cm5-vim": "^0.0.5",
@@ -45,7 +51,9 @@
     "dependencies": {},
     "devDependencies": {}
   },
-  "dependencies": {},
+  "dependencies": {
+    "typescript": "^5.9.3"
+  },
   "publishConfig": {
     "tag": "version5"
   }

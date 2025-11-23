@@ -412,7 +412,12 @@ CodeMirror.defineMode("css", function(config, parserConfig) {
     blockCommentEnd: "*/",
     blockCommentContinue: " * ",
     lineComment: lineComment,
-    fold: "brace"
+    fold: "brace",
+
+    stringQuotes: {
+      inline: `'"`,
+      escape: `\\`,
+    },
   };
 });
 

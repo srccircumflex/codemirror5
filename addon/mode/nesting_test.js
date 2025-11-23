@@ -14,7 +14,7 @@
       innerStyle: 'inner'
     };
 
-    return CodeMirror.nestingMode(outer, innerOptions);
+    return CodeMirror.Nester(outer, innerOptions);
   });
 
   var mode = CodeMirror.getMode({}, "markdown_with_stex");
@@ -32,7 +32,7 @@
     "[strong **Equation:**] [delim&delim-open $][inner&tag \\pi][delim&delim-close $]");
 
   CodeMirror.defineMode("identical_delim_nesting", function() {
-    return CodeMirror.nestingMode(CodeMirror.getMode({indentUnit: 2}, "javascript"), {
+    return CodeMirror.Nester(CodeMirror.getMode({indentUnit: 2}, "javascript"), {
       open: "#",
       close: "#",
       mode: CodeMirror.getMode({}, "markdown"),

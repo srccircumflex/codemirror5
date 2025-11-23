@@ -1,5 +1,4 @@
 import { CodeMirror } from "./edit/main.js"
-
 export default CodeMirror
 
 CodeMirror.async = function DevCodeMirrorAsync () {
@@ -12,7 +11,7 @@ CodeMirror.async = function DevCodeMirrorAsync () {
       } else {
         i += 1
         if (i >= 40) {
-          console.error("[await CodeMirror] reject: not set after 2 seconds!")
+          console.info("[async CodeMirror (dev)] reject: not loaded after 2 seconds")
           return reject()
         } else {
           setTimeout(query, 50)
@@ -22,3 +21,6 @@ CodeMirror.async = function DevCodeMirrorAsync () {
     query()
   })
 }()
+
+import addNester from "./nesting/main.js"
+addNester(CodeMirror)

@@ -6,24 +6,45 @@ import { countColumn } from "./misc.js"
 // parsers more succinct.
 
 class StringStream {
-  constructor(string, tabSize, lineOracle) {
-    this.pos = this.start = 0
-    this.string = string
+  constructor(string, tabSize, lineOracle, startAt) {
+    this.pos = this.start = startAt || 0
     this.tabSize = tabSize || 8
     this.lastColumnPos = this.lastColumnValue = 0
     this.lineStart = 0
     this.lineOracle = lineOracle
+    this.string = this.data = string == "" ? "\n" : string
+    this.delims = [];
   }
 
-  eol() {return this.pos >= this.string.length}
+  data;
+  set delim (delim) {
+    if (delim === undefined) {
+      this.delims.pop();
+    } else {
+      this.delims.push(delim);
+    }
+    this.data = this.string.slice(0, this.delim);
+  }
+  get delim () {return this.delims.length ? this.delims[this.delims.length-1] : this.string.length;}
+
+  eod() {return this.pos >= this.delim}
+  drt() {
+    if (this.eod()) {
+      this.delim = undefined;
+      return true;
+    }
+    return !this.delims.length;
+  }
+
+  eol() {return this.pos >= this.delim}
   sol() {return this.pos == this.lineStart}
   peek() {return this.string.charAt(this.pos) || undefined}
   next() {
-    if (this.pos < this.string.length)
-      return this.string.charAt(this.pos++)
+    if (this.pos < this.data.length)
+      return this.data.charAt(this.pos++)
   }
   eat(match) {
-    let ch = this.string.charAt(this.pos)
+    let ch = this.data.charAt(this.pos)
     let ok
     if (typeof match == "string") ok = ch == match
     else ok = ch && (match.test ? match.test(ch) : match(ch))
@@ -36,13 +57,13 @@ class StringStream {
   }
   eatSpace() {
     let start = this.pos
-    while (/[\s\u00a0]/.test(this.string.charAt(this.pos))) ++this.pos
+    while (/[\s\u00a0]/.test(this.data.charAt(this.pos))) ++this.pos
     return this.pos > start
   }
-  skipToEnd() {this.pos = this.string.length}
+  skipToEnd() {this.pos = this.delim}
   skipTo(ch) {
-    let found = this.string.indexOf(ch, this.pos)
-    if (found > -1) {this.pos = found; return true}
+    let found = this.data.indexOf(ch, this.pos)
+    if (found != -1) {this.pos = found; return true}
   }
   backUp(n) {this.pos -= n}
   column() {
@@ -59,19 +80,19 @@ class StringStream {
   match(pattern, consume, caseInsensitive) {
     if (typeof pattern == "string") {
       let cased = str => caseInsensitive ? str.toLowerCase() : str
-      let substr = this.string.substr(this.pos, pattern.length)
+      let substr = this.data.substr(this.pos, pattern.length)
       if (cased(substr) == cased(pattern)) {
         if (consume !== false) this.pos += pattern.length
         return true
       }
     } else {
-      let match = this.string.slice(this.pos).match(pattern)
+      let match = this.data.slice(this.pos).match(pattern)
       if (match && match.index > 0) return null
       if (match && consume !== false) this.pos += match[0].length
-      return match
+      return match && match[0].length
     }
   }
-  current(){return this.string.slice(this.start, this.pos)}
+  current(){return this.data.slice(this.start, this.pos)}
   hideFirstChars(n, inner) {
     this.lineStart += n
     try { return inner() }

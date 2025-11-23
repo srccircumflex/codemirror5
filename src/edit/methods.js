@@ -3,9 +3,9 @@ import { commands } from "./commands.js"
 import { attachDoc } from "../model/document_data.js"
 import { activeElt, addClass, rmClass, root, win } from "../util/dom.js"
 import { eventMixin, signal } from "../util/event.js"
-import { getLineStyles, getContextBefore, takeToken } from "../line/highlight.js"
+import { getLineTokens, getContextBefore, Token } from "../line/highlight.js"
 import { indentLine } from "../input/indent.js"
-import { triggerElectric } from "../input/input.js"
+import { triggerElectric, triggerElectricInput, triggerElectricCloseDelim, applyTextInput } from "../input/input.js"
 import { onKeyDown, onKeyPress, onKeyUp } from "./key_events.js"
 import { onMouseDown } from "./mouse_events.js"
 import { getKeyMap } from "../input/keymap.js"
@@ -88,11 +88,14 @@ export default function(CodeMirror) {
     }),
 
     indentLine: methodOp(function(n, dir, aggressive) {
-      if (typeof dir != "string" && typeof dir != "number") {
-        if (dir == null) dir = this.options.smartIndent ? "smart" : "prev"
-        else dir = dir ? "add" : "subtract"
+      if (isLine(this.doc, n)) {
+        if (dir == null) {
+          dir = this.options.smartIndent ? "smart" : "prev"
+        } else if (["boolean", "undefined"].includes(typeof dir)) {
+          dir = dir ? "add" : "subtract"
+        }
+        indentLine(this, n, dir, aggressive)
       }
-      if (isLine(this.doc, n)) indentLine(this, n, dir, aggressive)
     }),
     indentSelection: methodOp(function(how) {
       let ranges = this.doc.sel.ranges, end = -1
@@ -118,33 +121,41 @@ export default function(CodeMirror) {
     // Fetch the parser token for a given character. Useful for hacks
     // that want to inspect the mode state (say, for completion).
     getTokenAt: function(pos, precise) {
-      return takeToken(this, pos, precise)
+      return Token.ReadAt(this, pos, precise)
     },
 
     getLineTokens: function(line, precise) {
-      return takeToken(this, Pos(line), precise, true)
+      return Token.ReadLine(this, Pos(line), precise)
+    },
+
+    getLineTokenSpecs: function(line) {
+      let tokens = getLineTokens(this, getLine(this.doc, line)), specs = [];
+      for (var i = 2; i<tokens.length; i+=2) {specs.push(tokens[i])}
+      return specs;
     },
 
     getTokenTypeAt: function(pos) {
       pos = clipPos(this.doc, pos)
-      let styles = getLineStyles(this, getLine(this.doc, pos.line))
-      let before = 0, after = (styles.length - 1) / 2, ch = pos.ch
+      let tokens = getLineTokens(this, getLine(this.doc, pos.line))
+      let before = 0, after = (tokens.length - 1) / 2, ch = pos.ch
       let type
-      if (ch == 0) type = styles[2]
+      if (ch == 0) type = tokens[2].token
       else for (;;) {
         let mid = (before + after) >> 1
-        if ((mid ? styles[mid * 2 - 1] : 0) >= ch) after = mid
-        else if (styles[mid * 2 + 1] < ch) before = mid + 1
-        else { type = styles[mid * 2 + 2]; break }
+        if ((mid ? tokens[mid * 2 - 1] : 0) >= ch) after = mid
+        else if (tokens[mid * 2 + 1] < ch) before = mid + 1
+        else { type = tokens[mid * 2 + 2].token; break }
       }
       let cut = type ? type.indexOf("overlay ") : -1
       return cut < 0 ? type : cut == 0 ? null : type.slice(0, cut - 1)
     },
 
     getModeAt: function(pos) {
-      let mode = this.doc.mode
-      if (!mode.innerMode) return mode
-      return CodeMirror.innerMode(mode, this.getTokenAt(pos).state).mode
+      return this.getTokenAt(pos).innerMode;
+    },
+
+    applyTextInput: function (inserted, deleted, origin, sel) {
+      applyTextInput(this, inserted, deleted, sel, origin || "meth")
     },
 
     getHelper: function(pos, type) {
@@ -267,6 +278,8 @@ export default function(CodeMirror) {
     },
 
     triggerElectric: methodOp(function(text) { triggerElectric(this, text) }),
+    triggerElectricInput: methodOp(function(token, inserted, selRange) { triggerElectricInput(this, token, inserted, selRange) }),
+    triggerElectricCloseDelim: methodOp(function(token, selRange) { triggerElectricCloseDelim(this, token, selRange) }),
 
     findPosH: function(from, amount, unit, visually) {
       let dir = 1

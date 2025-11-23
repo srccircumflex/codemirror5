@@ -15,19 +15,20 @@ import { signalLater } from "../util/operation_group.js"
 //
 // See also http://marijnhaverbeke.nl/blog/codemirror-line-tree.html
 
-export function LeafChunk(lines) {
-  this.lines = lines
-  this.parent = null
-  let height = 0
-  for (let i = 0; i < lines.length; ++i) {
-    lines[i].parent = this
-    height += lines[i].height
-  }
-  this.height = height
-}
+export class LeafChunk {
 
-LeafChunk.prototype = {
-  chunkSize() { return this.lines.length },
+  constructor (lines) {
+    this.lines = lines
+    this.parent = null
+    let height = 0
+    for (let i = 0; i < lines.length; ++i) {
+      lines[i].parent = this
+      height += lines[i].height
+    }
+    this.height = height
+  }
+  
+  chunkSize() { return this.lines.length }
 
   // Remove the n lines at offset 'at'.
   removeInner(at, n) {
@@ -38,12 +39,12 @@ LeafChunk.prototype = {
       signalLater(line, "delete")
     }
     this.lines.splice(at, n)
-  },
+  }
 
   // Helper used to collapse a small branch into a single leaf.
   collapse(lines) {
     lines.push.apply(lines, this.lines)
-  },
+  }
 
   // Insert the given array of lines at offset 'at', count them as
   // having the given height.
@@ -51,7 +52,7 @@ LeafChunk.prototype = {
     this.height += height
     this.lines = this.lines.slice(0, at).concat(lines).concat(this.lines.slice(at))
     for (let i = 0; i < lines.length; ++i) lines[i].parent = this
-  },
+  }
 
   // Used to iterate over a part of the tree.
   iterN(at, n, op) {

@@ -1,5 +1,6 @@
 import buble from '@rollup/plugin-buble';
-import copy from 'rollup-plugin-copy'
+import copy from 'rollup-plugin-copy';
+import babel from '@rollup/plugin-babel';
 
 let copyVim = copy({
   targets: [
@@ -27,7 +28,20 @@ export default [
       file: "lib/codemirror.js",
       name: "CodeMirror"
     },
-    plugins: [ buble({namedFunctionExpressions: false}), copyVim ]
+    plugins: [ 
+      babel({
+        babelHelpers: 'bundled',
+        presets: [
+          ['@babel/preset-env', { targets: "defaults" }]
+        ],
+        plugins: [
+          '@babel/plugin-proposal-optional-chaining',
+          '@babel/plugin-proposal-logical-assignment-operators',
+          '@babel/plugin-transform-class-properties',
+        ]
+      }),
+      copyVim 
+    ]
   },
   {
     input: ["src/addon/runmode/runmode-standalone.js"],
