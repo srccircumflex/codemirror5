@@ -1,0 +1,1 @@
+export const NESTER = {toString: () => "CodeMirror.Nester.NESTER"};

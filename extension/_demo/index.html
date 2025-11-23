@@ -1,0 +1,265 @@
+<!doctype html>
+
+<title>CodeMirror: HTML [nested]</title>
+<meta charset="utf-8"/>
+<link rel=stylesheet href="../../doc/docs.css">
+
+<link rel="stylesheet" href="../../lib/codemirror.css">
+
+<script type="module" src="../../lib/codemirror.mjs"></script>
+
+<script type="module" src="../nesting/mode/xml/xml.js"></script>
+<script type="module" src="../../mode/javascript/javascript.js"></script>
+<script type="module" src="../../mode/css/css.js"></script>
+<script type="module" src="../nesting/mode/html/html.js"></script>
+
+<script type="module" src="../../mode/python/python.js"></script>
+<script type="module" src="../../mode/python/python.js"></script>
+
+<script type="module" src="../nesting/addon/autoclose.js"></script>
+
+<script src="../../lib/codemirror.js"></script>
+
+<style>
+  /* MODIFICATIONS > */
+  .cm-error {border-bottom: 1px solid red;}
+  .CodeMirror {
+    border-top: 1px solid black;
+    border-bottom: 1px solid black;
+    height: 1000px;
+  }
+  /* < MODIFICATIONS */
+  /* EXTENSIONS > */
+  .cm-x {color: #ff6391; font-weight: bold;}
+  .cm-x-delim1 {color: #ff6391; font-weight: bold;}
+  .cm-x-delim2 {color: #ffc863; font-weight: bold;}
+  .cm-x-name1 {color: #4e479d; font-weight: bold;}
+  .cm-x-name2 {color: #47979d; font-weight: bold;}
+  .cm-x-getter {color: rgb(1, 201, 28);}
+  .cm-backslash-esc {color: #8c00ff;}
+  .cm-lang {color: #0066ff;}
+  .cm-lang-bg {background-color: #ffa7000d;}
+  .cm-delimit {color: #fa4;}
+  /* < EXTENSIONS */
+</style>
+<div id=nav>
+  <a href="https://codemirror.net/5"><h1>CodeMirror</h1><img id=logo src="../../doc/logo.png" alt=""></a>
+
+  <ul>
+    <li><a href="../../index.html">Home</a>
+    <li><a href="../../doc/manual.html">Manual</a>
+    <li><a href="https://github.com/codemirror/codemirror5">Code</a>
+  </ul>
+  <ul>
+    <li><a href="../../mode/index.html">Language modes</a>
+    <li><a class=active href="#">HTML [nested]</a>
+  </ul>
+</div>
+
+<article>
+<h2>HTML [nested]</h2>
+<form><textarea id="code" name="code">
+<!-- TEXTAREA -->
+<html style="color: green; content: '</html>'">
+  <!-- this is a comment -->
+  <head>
+    <title>HTML Example</title>
+    <style>#frame {border: 1px solid;}</style>
+  </head>
+  <body>
+    The indentation tries to be <em>somewhat "do what
+    I mean"</em>... but might not match your style.
+  </body>
+  <script>function js () {console.log("some javascript");}</script>
+  &lt;script>const Tag = new class {
+    constructor () {this.tag = '</script>';}
+  }</script>
+  &lt;script lang="pyx">
+    # NESTING MODE DEMO
+
+    $answer$ = 42
+
+    for i in $answer.range$[0;]:
+      if i % 2 == 0:
+        print(i, end = "$\" ")
+
+    print(
+      f"recursive nesting: {
+      # (i) current python versions actually support infinite nesting of
+      # an f string literal with the same quote types, as well as line
+      # breaks and comments in replacement fields.
+      $answer$ - 12 * int(f"{9 + $answer$}")}"[0:]
+      + html§
+          <html>
+            <h1>this is html</h1>
+            <script>
+              alert("And here is some normal JS code"); // also colored
+            </script>
+          </html>
+          §
+         )
+
+    EOF]
+
+  </script>
+</html>
+<!-- TEXTAREA -->
+</textarea></form>
+    <script>
+      let editor;
+
+      CodeMirror.async.then((CodeMirror) => {
+
+        CodeMirror.defineMode("x", function() {
+          return {
+            token: function(stream) {
+              switch (stream.next()) {
+                case "$":
+                  return "x";
+                case "\\":
+                  stream.next();
+                  return "backslash-esc";
+                case ".":
+                  return "x-delim1";
+                default:
+                  stream.eatWhile(/[^$\\.]/);
+                  return "x-name1";
+              }
+            }
+          }
+        })
+
+        CodeMirror.defineMode("x[...]", function(config) {
+          return {
+            token: function(stream) {
+              switch (stream.next()) {
+                case ";":
+                  return "x-delim2";
+                default:
+                  stream.eatWhile(/[^;]/);
+                  return "x-name2";
+              }
+            }
+          }
+        })
+
+        const BS_MASK = {
+          mask: true,
+          open: /\\(.|$)/,
+          close: "",
+        };
+
+        const COMMENT_MASK = {
+          mask: true,
+          open: "#",
+        };
+
+        const STRING_MASK = {
+          mask: true,
+          open: /"""|'''|"|'/,
+          start: (match) => {return {close: match[0]};},
+          masks: [BS_MASK],
+        };
+
+
+        CodeMirror.defineMode("f-string", function(config, parserConfig) {
+          return {
+            token: function(stream) {
+              stream.skipToEnd();
+              return "string";
+            }
+          }
+        })
+
+        const FSRING_MODE = CodeMirror.Nester(
+          CodeMirror.getMode({}, "f-string"),
+          {
+            mask: true,
+            open: /{{|}}/,
+            close: "",
+          },
+          {
+            open: "{",
+            close: "}",
+            mode: "pyx"
+          }
+        );
+
+        CodeMirror.defineMode("pyx", function(config) {
+          return CodeMirror.Nester(
+            CodeMirror.getMode(config, "text/x-python"),
+            STRING_MASK,
+            COMMENT_MASK,
+            BS_MASK,
+            {
+              open: /(fr?|rf?)("""|'''|"|')/i,
+              start: (match) => {return {close: match[2]}},
+              masks: [BS_MASK],
+              mode: FSRING_MODE,
+              delimToken: true,
+            },
+            {
+              open: /\$(?!\s)/,
+              close: "$",
+              mode: "x",
+              masks: [BS_MASK],
+              delimToken: true,
+              suffixes: [
+                {
+                  open: /^\[/,
+                  close: "]",
+                  mode: "x[...]",
+                  masks: [BS_MASK],
+                  delimToken: "x-getter"
+                }
+              ]
+            },
+            {
+              open: /(HTML|ML|X)§/i,
+              close: "§",
+              mode: "html",
+              masks: [BS_MASK],
+              delimToken: "lang",
+              innerStyle: "lang-bg",
+            },
+          )
+        })
+
+        editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+          mode: {
+            name: "html",
+            tagConfigs: {
+              update: {
+                script: {
+                  innerModeByAttrs: [
+                    ["lang", /^pyx$/i, "pyx"],
+                  ]
+                }
+              }
+            }
+          },
+          lineNumbers: true,
+          tabMode: 'spaces',
+        });
+
+
+
+      })
+    </script>
+    <p>The XML mode supports these configuration parameters:</p>
+    <dl>
+      <dt><code>htmlMode (boolean)</code></dt>
+      <dd>This switches the mode to parse HTML instead of XML. This
+      means attributes do not have to be quoted, and some elements
+      (such as <code>br</code>) do not require a closing tag.</dd>
+      <dt><code>matchClosing (boolean)</code></dt>
+      <dd>Controls whether the mode checks that close tags match the
+      corresponding opening tag, and highlights mismatches as errors.
+      Defaults to true.</dd>
+      <dt><code>alignCDATA (boolean)</code></dt>
+      <dd>Setting this to true will force the opening tag of CDATA
+      blocks to not be indented.</dd>
+    </dl>
+
+    <p><strong>MIME types defined:</strong> <code>application/xml</code>, <code>text/html</code>.</p>
+  </article>
